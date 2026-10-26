@@ -2,7 +2,7 @@ import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { clearSession, isUnauthorized } from '@/lib/auth';
 
 export function createQueryClient() {
-  // Any 401 (e.g. the session cookie expired) signs the user out, which sends them to /login.
+  // UNAUTHENTICATED or USER_INACTIVE (e.g. the session expired) signs the user out, which sends them to /login.
   const onError = (error: unknown) => {
     if (isUnauthorized(error)) clearSession(queryClient);
   };

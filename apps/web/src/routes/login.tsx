@@ -1,3 +1,4 @@
+import { type LoginInput, LoginInputSchema, type Role } from '@erp/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
@@ -5,23 +6,36 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { isUnauthorized, safeRedirect, useSession } from '@/lib/auth';
+import { safeRedirect, useSession } from '@/lib/auth';
+import { errorMessage, fieldIssues, toApiError } from '@/lib/errors';
 import { orpc } from '@/lib/orpc';
+import { ROLE_LABELS } from '@/lib/roles';
 
-// Created by packages/database/prisma/seed.ts.
-const demoAccounts = [
-  { email: 'admin@erp.local', role: 'ADMIN' },
-  { email: 'staff@erp.local', role: 'STAFF' },
+// Created by packages/database/src/fixture.ts.
+const demoAccounts: { username: string; role: Role }[] = [
+  { username: 'admin01', role: 'ADMIN' },
+  { username: 'buyer01', role: 'PURCHASING' },
+  { username: 'staff_b01', role: 'STORE_STAFF' },
+  { username: 'staff_b02', role: 'STORE_STAFF' },
+  { username: 'manager01', role: 'MANAGER' },
 ];
 const DEMO_PASSWORD = 'password';
+
+type Field = keyof LoginInput;
+
+const REQUIRED: Record<Field, string> = {
+  username: 'กรุณากรอกชื่อผู้ใช้',
+  password: 'กรุณากรอกรหัสผ่าน',
+};
 
 export function LoginPage() {
   const [searchParams] = useSearchParams();
   const redirectTo = safeRedirect(searchParams.get('redirect'));
   const queryClient = useQueryClient();
   const session = useSession();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [blankFields, setBlankFields] = useState<Partial<Record<Field, string>>>({});
 
   const login = useMutation(
     orpc.auth.login.mutationOptions({
@@ -32,74 +46,135 @@ export function LoginPage() {
 
   if (session.data?.user) return <Navigate to={redirectTo} replace />;
 
+  const error = login.error ? toApiError(login.error) : null;
+  // A `correct` error goes beside its field when it has one, otherwise above the button.
+  const serverFields = error ? fieldIssues(error) : {};
+  const fieldError = (field: Field) =>
+    blankFields[field] ?? (field in serverFields && error ? errorMessage(error) : undefined);
+  const formError = error && Object.keys(serverFields).length === 0 ? error : null;
+
+  function submit() {
+    const parsed = LoginInputSchema.safeParse({ username, password });
+    if (!parsed.success) {
+      const blank: Partial<Record<Field, string>> = {};
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0] as Field;
+        blank[field] = REQUIRED[field];
+      }
+      setBlankFields(blank);
+      login.reset();
+      return;
+    }
+    setBlankFields({});
+    login.mutate(parsed.data);
+  }
+
   return (
     <div className="flex min-h-svh items-center justify-center bg-muted p-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-xl">ERP Workshop</CardTitle>
-          <CardDescription>Sign in to continue</CardDescription>
+          <CardDescription>เข้าสู่ระบบเพื่อใช้งาน</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <form
             className="space-y-4"
+            noValidate
             onSubmit={(event) => {
               event.preventDefault();
-              login.mutate({ email, password });
+              submit();
             }}
           >
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="username"
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </div>
-            {login.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {isUnauthorized(login.error)
-                  ? 'Invalid email or password.'
-                  : 'Could not sign in. Is the API running?'}
-              </p>
+            <TextField
+              id="username"
+              label="ชื่อผู้ใช้"
+              autoComplete="username"
+              autoFocus
+              value={username}
+              onChange={setUsername}
+              error={fieldError('username')}
+            />
+            <TextField
+              id="password"
+              label="รหัสผ่าน"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={setPassword}
+              error={fieldError('password')}
+            />
+            {formError && (
+              <div role="alert" className="space-y-2 text-sm text-destructive">
+                <p>{errorMessage(formError)}</p>
+                {formError.kind === 'retry' && login.variables && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => login.mutate(login.variables)}
+                  >
+                    ลองอีกครั้ง
+                  </Button>
+                )}
+              </div>
             )}
             <Button type="submit" className="w-full" disabled={login.isPending}>
-              {login.isPending ? 'Signing in…' : 'Sign in'}
+              {login.isPending ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
             </Button>
           </form>
 
           <div className="space-y-2 rounded-md border bg-muted/50 p-3 text-sm">
-            <p className="font-medium">Demo accounts (password: {DEMO_PASSWORD})</p>
+            <p className="font-medium">บัญชีทดลอง (รหัสผ่าน: {DEMO_PASSWORD})</p>
             {demoAccounts.map((account) => (
               <button
-                key={account.email}
+                key={account.username}
                 type="button"
                 className="flex w-full justify-between text-left text-muted-foreground hover:text-foreground"
                 onClick={() => {
-                  setEmail(account.email);
+                  setUsername(account.username);
                   setPassword(DEMO_PASSWORD);
                 }}
               >
-                <span>{account.email}</span>
-                <span>{account.role}</span>
+                <span>{account.username}</span>
+                <span>{ROLE_LABELS[account.role]}</span>
               </button>
             ))}
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function TextField({
+  id,
+  label,
+  error,
+  onChange,
+  ...input
+}: {
+  id: Field;
+  label: string;
+  error: string | undefined;
+  onChange: (value: string) => void;
+} & Omit<React.ComponentProps<typeof Input>, 'id' | 'onChange'>) {
+  const errorId = `${id}-error`;
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        required
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        onChange={(event) => onChange(event.target.value)}
+        {...input}
+      />
+      {error && (
+        <p id={errorId} className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

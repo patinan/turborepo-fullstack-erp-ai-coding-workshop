@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { clearSession, useCurrentUser } from '@/lib/auth';
 import { orpc } from '@/lib/orpc';
+import { ROLE_LABELS } from '@/lib/roles';
 
 export function UserMenu() {
   const user = useCurrentUser();
@@ -17,7 +18,12 @@ export function UserMenu() {
   return (
     <div className="flex items-center gap-3 text-sm font-normal">
       <span>{user.name}</span>
-      <Badge variant="secondary">{user.role}</Badge>
+      <Badge variant="secondary">{ROLE_LABELS[user.role]}</Badge>
+      {user.store && (
+        <span className="text-muted-foreground">
+          {user.store.code} {user.store.name}
+        </span>
+      )}
       <Button
         variant="ghost"
         size="sm"
@@ -25,7 +31,7 @@ export function UserMenu() {
         disabled={logout.isPending}
       >
         <LogOut />
-        Log out
+        ออกจากระบบ
       </Button>
     </div>
   );

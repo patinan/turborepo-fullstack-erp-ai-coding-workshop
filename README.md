@@ -54,10 +54,13 @@ The first start takes a few minutes. When the logs settle:
 
 Sign in with one of the demo accounts (they are also listed on the login page):
 
-| Email             | Password   | Role    |
-| ----------------- | ---------- | ------- |
-| `admin@erp.local` | `password` | `ADMIN` |
-| `staff@erp.local` | `password` | `STAFF` |
+| Username    | Password   | Role          | Store              |
+| ----------- | ---------- | ------------- | ------------------ |
+| `admin01`   | `password` | `ADMIN`       |                    |
+| `buyer01`   | `password` | `PURCHASING`  |                    |
+| `staff_b01` | `password` | `STORE_STAFF` | B01 Central Store  |
+| `staff_b02` | `password` | `STORE_STAFF` | B02 Riverside Store |
+| `manager01` | `password` | `MANAGER`     |                    |
 
 The home page then shows a **System status** card. **API ✅ / Database ✅** means the full chain works: React → typed client → Vite proxy → NestJS → Prisma → Postgres.
 
@@ -67,11 +70,12 @@ Stop with `Ctrl+C`, or `docker compose down`. Add `-v` to also delete the databa
 
 ### Signing in
 
-Auth is deliberately minimal and only meant for the workshop. There is no sign-up or password reset: users come from `packages/database/prisma/seed.ts`, which runs every time the api starts.
+Auth is deliberately minimal and only meant for the workshop. There is no sign-up or password reset: users come from `packages/database/src/fixture.ts`, which the seed loads every time the api starts.
 
-- `POST /api/auth/login` checks the password and sets an httpOnly cookie holding the user id, signed with `AUTH_SECRET` and valid for 7 days. `auth.logout` clears it, and `auth.me` returns the current user.
+- `POST /api/auth/login` takes a username (case and surrounding spaces are ignored) and password, and sets an httpOnly cookie holding the user id and sign-in time, signed with `AUTH_SECRET` and valid for 12 hours. `auth.logout` ends every session of that user, and `auth.me` returns the current user (with their store for `STORE_STAFF`).
+- Every failed call answers `{ code, kind, data? }`. The codes live in `packages/contracts/src/errors.ts`; the web shows a Thai message for each (`apps/web/src/lib/errors.ts`, ADR-0003).
 - Every API route requires a signed-in user unless it is marked `@Public()`. `@Roles('ADMIN')` limits a route to certain roles (`apps/api/src/auth`).
-- In the web app, every page under `RequireAuth` redirects to `/login` when nobody is signed in or any request returns 401 (`apps/web/src/lib/auth.ts`).
+- In the web app, every page under `RequireAuth` redirects to `/login` when nobody is signed in or any request answers `UNAUTHENTICATED` (`apps/web/src/lib/auth.ts`).
 
 ### Browse the database
 
@@ -88,6 +92,7 @@ docker compose exec api pnpm db:migrate --name add_customers   # after editing s
 docker compose exec api pnpm db:seed
 docker compose exec api pnpm db:reset                          # wipe + re-migrate + seed
 docker compose exec api pnpm check                             # lint + typecheck + test + build
+docker compose --profile e2e run --rm --no-deps e2e            # Playwright on Chrome + Edge, against the running stack
 docker compose exec api pnpm add <pkg> --filter @erp/web       # add a dependency
 ```
 
@@ -99,6 +104,7 @@ docker compose exec api pnpm add <pkg> --filter @erp/web       # add a dependenc
 apps/
   web/          @erp/web        React app (talks only to /api, proxied by Vite)
   api/          @erp/api        NestJS app (implements the contract)
+  e2e/          @erp/e2e        Playwright suite (Chrome + Edge, 1366×768)
 packages/
   contracts/    @erp/contracts  API contract: routes + Zod schemas (shared!)
   database/     @erp/database   Prisma schema, migrations, seed, client
