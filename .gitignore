@@ -16,6 +16,9 @@ dist/
 .env.*
 !.env.example
 
+# local root CAs for docker builds (docker/certs/README.md)
+docker/certs/*.crt
+
 # logs
 *.log
 npm-debug.log*

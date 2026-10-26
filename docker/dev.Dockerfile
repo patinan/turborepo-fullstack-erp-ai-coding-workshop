@@ -7,6 +7,12 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
+# Optional extra root CAs (e.g. a corporate TLS-inspecting proxy like Zscaler).
+# Any *.crt (PEM) in docker/certs/ is trusted by the OS and by Node (npm, pnpm, Prisma).
+COPY docker/certs/ /usr/local/share/ca-certificates/extra/
+RUN update-ca-certificates
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+
 # Keep in sync with "packageManager" in the root package.json.
 RUN npm install -g pnpm@12.15.0
 
