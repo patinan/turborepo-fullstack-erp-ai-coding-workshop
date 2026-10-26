@@ -16,7 +16,8 @@ export function useCurrentUser(): User | null {
 /** The session is missing, expired, signed out or its user was deactivated. */
 export function isUnauthorized(error: unknown): boolean {
   return (
-    error instanceof ORPCError && (error.code === 'UNAUTHENTICATED' || error.code === 'USER_INACTIVE')
+    error instanceof ORPCError &&
+    (error.code === 'UNAUTHENTICATED' || error.code === 'USER_INACTIVE')
   );
 }
 

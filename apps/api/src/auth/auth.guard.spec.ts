@@ -11,7 +11,13 @@ import type { UserRow } from './user.js';
 
 const secret = 'test-secret-that-is-at-least-32-characters';
 const b01 = { id: 's1', code: 'B01', name: 'Central Store' };
-const staff = { id: 'u1', username: 'staff_b01', name: 'Staff B01', role: 'STORE_STAFF', store: b01 };
+const staff = {
+  id: 'u1',
+  username: 'staff_b01',
+  name: 'Staff B01',
+  role: 'STORE_STAFF',
+  store: b01,
+};
 const staffRow: UserRow = { ...staff, role: 'STORE_STAFF', active: true, sessionsRevokedAt: null };
 
 class RoutesUnderTest {
@@ -65,9 +71,9 @@ describe('AuthGuard', () => {
   it('rejects a tampered cookie', async () => {
     const { run, findUnique } = setup(staffRow);
 
-    await expect(
-      run('closed', `${SESSION_COOKIE}=u1.9999999999999.forged`).result,
-    ).rejects.toEqual(rejectsWith('UNAUTHENTICATED'));
+    await expect(run('closed', `${SESSION_COOKIE}=u1.9999999999999.forged`).result).rejects.toEqual(
+      rejectsWith('UNAUTHENTICATED'),
+    );
     expect(findUnique).not.toHaveBeenCalled();
   });
 

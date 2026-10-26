@@ -17,7 +17,7 @@ pnpm db:migrate --name <describe_the_change>     # inside Docker: docker compose
 
 - `migrate dev` does not run `prisma generate`. `pnpm dev` / `turbo` do it for you; run `pnpm db:generate` by hand only if types are stale.
 - The client is generated into `packages/database/src/generated` (gitignored). Import `PrismaClient` and model types from `@erp/database`, never from the generated path.
-- Seed data lives in `prisma/seed.ts` (`pnpm db:seed`). Use `upsert` so the seed is re-runnable.
+- Seed data lives in `src/fixture.ts`, which `prisma/seed.ts` loads (`pnpm db:seed`). Use `upsert` so the seed is re-runnable.
 
 ## 2. Contract (`packages/contracts`)
 
@@ -91,7 +91,7 @@ export class CustomersModule {}
 Register the module in `src/app.module.ts`. `PrismaService` is global, no import needed.
 
 - `input` is already validated and typed by the contract. No DTOs, no `class-validator`.
-- For errors use `ORPCError` from `@orpc/server` (e.g. `throw new ORPCError('NOT_FOUND')`).
+- For errors throw a catalogue code with `apiError` from `../errors/api-error.js` (e.g. `throw apiError('NOT_FOUND')`). New codes go into `packages/contracts/src/errors.ts` and need a Thai message in `apps/web/src/lib/errors.ts` (ADR-0003).
 - Auth: every route already requires a signed-in user. Imports come from `../auth/auth.decorators.js`:
 
   ```ts

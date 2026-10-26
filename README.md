@@ -54,13 +54,13 @@ The first start takes a few minutes. When the logs settle:
 
 Sign in with one of the demo accounts (they are also listed on the login page):
 
-| Username    | Password   | Role          | Store              |
-| ----------- | ---------- | ------------- | ------------------ |
-| `admin01`   | `password` | `ADMIN`       |                    |
-| `buyer01`   | `password` | `PURCHASING`  |                    |
-| `staff_b01` | `password` | `STORE_STAFF` | B01 Central Store  |
+| Username    | Password   | Role          | Store               |
+| ----------- | ---------- | ------------- | ------------------- |
+| `admin01`   | `password` | `ADMIN`       |                     |
+| `buyer01`   | `password` | `PURCHASING`  |                     |
+| `staff_b01` | `password` | `STORE_STAFF` | B01 Central Store   |
 | `staff_b02` | `password` | `STORE_STAFF` | B02 Riverside Store |
-| `manager01` | `password` | `MANAGER`     |                    |
+| `manager01` | `password` | `MANAGER`     |                     |
 
 The home page then shows a **System status** card. **API ✅ / Database ✅** means the full chain works: React → typed client → Vite proxy → NestJS → Prisma → Postgres.
 

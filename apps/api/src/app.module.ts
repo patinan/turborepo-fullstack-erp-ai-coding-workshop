@@ -19,7 +19,9 @@ import { OpenApiModule } from './openapi/openapi.module.js';
       validate: validateEnv,
     }),
     // Every failed oRPC call answers { code, kind, data? } (ADR-0003).
-    ORPCModule.forRoot({ customErrorResponseBodyEncoder: (error) => encodeApiError(toApiError(error)) }),
+    ORPCModule.forRoot({
+      customErrorResponseBodyEncoder: (error) => encodeApiError(toApiError(error)),
+    }),
     DatabaseModule,
     AuthModule,
     HealthModule,

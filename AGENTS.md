@@ -10,6 +10,7 @@ A teaching monorepo for a full-stack ERP (Turborepo + pnpm workspaces, runs in D
 | -------------------- | ---------------- | ------------------------------------------------------------------ |
 | `apps/web`           | `@erp/web`       | Vite + React 19, React Router, TanStack Query, Tailwind v4, shadcn |
 | `apps/api`           | `@erp/api`       | NestJS 12 (native ESM), implements the oRPC contract, Prisma       |
+| `apps/e2e`           | `@erp/e2e`       | Playwright suite on Chrome + Edge against the Docker Compose stack |
 | `packages/contracts` | `@erp/contracts` | oRPC routes + Zod schemas. Single source of truth for the API      |
 | `packages/database`  | `@erp/database`  | Prisma 7 schema, migrations, seed, generated client                |
 

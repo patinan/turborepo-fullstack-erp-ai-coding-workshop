@@ -27,8 +27,11 @@ test.describe('Sign-in screen', () => {
     await form.username.fill('staff_b01');
     await form.submit.click();
 
+    // The API rejects it with VALIDATION_FAILED (kind `correct`) and an issue on `password`.
     await expect(form.password).toHaveAttribute('aria-invalid', 'true');
-    await expect(form.password).toHaveAccessibleDescription('กรุณากรอกรหัสผ่าน');
+    await expect(form.password).toHaveAccessibleDescription(
+      'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่',
+    );
     await expect(form.username).not.toHaveAttribute('aria-invalid');
     await expect(page.getByRole('button', { name: 'ลองอีกครั้ง' })).toHaveCount(0);
   });

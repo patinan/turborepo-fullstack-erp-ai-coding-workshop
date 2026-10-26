@@ -1,4 +1,4 @@
-import { type LoginInput, LoginInputSchema, type Role } from '@erp/contracts';
+import type { LoginInput, Role } from '@erp/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
@@ -22,11 +22,7 @@ const demoAccounts: { username: string; role: Role }[] = [
 const DEMO_PASSWORD = 'password';
 
 type Field = keyof LoginInput;
-
-const REQUIRED: Record<Field, string> = {
-  username: 'กรุณากรอกชื่อผู้ใช้',
-  password: 'กรุณากรอกรหัสผ่าน',
-};
+const FIELDS: Field[] = ['username', 'password'];
 
 export function LoginPage() {
   const [searchParams] = useSearchParams();
@@ -35,7 +31,6 @@ export function LoginPage() {
   const session = useSession();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [blankFields, setBlankFields] = useState<Partial<Record<Field, string>>>({});
 
   const login = useMutation(
     orpc.auth.login.mutationOptions({
@@ -47,27 +42,11 @@ export function LoginPage() {
   if (session.data?.user) return <Navigate to={redirectTo} replace />;
 
   const error = login.error ? toApiError(login.error) : null;
-  // A `correct` error goes beside its field when it has one, otherwise above the button.
-  const serverFields = error ? fieldIssues(error) : {};
+  // An error about a field goes beside that field, any other error above the button.
+  const invalidFields = error ? fieldIssues(error) : {};
   const fieldError = (field: Field) =>
-    blankFields[field] ?? (field in serverFields && error ? errorMessage(error) : undefined);
-  const formError = error && Object.keys(serverFields).length === 0 ? error : null;
-
-  function submit() {
-    const parsed = LoginInputSchema.safeParse({ username, password });
-    if (!parsed.success) {
-      const blank: Partial<Record<Field, string>> = {};
-      for (const issue of parsed.error.issues) {
-        const field = issue.path[0] as Field;
-        blank[field] = REQUIRED[field];
-      }
-      setBlankFields(blank);
-      login.reset();
-      return;
-    }
-    setBlankFields({});
-    login.mutate(parsed.data);
-  }
+    error && field in invalidFields ? errorMessage(error) : undefined;
+  const formError = error && !FIELDS.some((field) => field in invalidFields) ? error : null;
 
   return (
     <div className="flex min-h-svh items-center justify-center bg-muted p-6">
@@ -82,7 +61,8 @@ export function LoginPage() {
             noValidate
             onSubmit={(event) => {
               event.preventDefault();
-              submit();
+              // The API trims, lower-cases and validates the input (the contract's LoginInputSchema).
+              login.mutate({ username, password });
             }}
           >
             <TextField

@@ -45,6 +45,10 @@ export async function loadFixture(prisma: PrismaClient) {
       active: true,
       sessionsRevokedAt: null,
     };
-    await prisma.user.upsert({ where: { username: user.username }, update: values, create: values });
+    await prisma.user.upsert({
+      where: { username: user.username },
+      update: values,
+      create: values,
+    });
   }
 }

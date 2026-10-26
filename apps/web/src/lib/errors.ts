@@ -41,7 +41,11 @@ export function decodeApiError(
 export function toApiError(error: unknown): ApiError {
   const code = error instanceof ORPCError ? ErrorCodeSchema.safeParse(error.code) : null;
   if (!code?.success) return { code: 'INTERNAL_ERROR', kind: ERRORS.INTERNAL_ERROR.kind };
-  return { code: code.data, kind: ERRORS[code.data].kind, data: (error as ORPCError<string, unknown>).data };
+  return {
+    code: code.data,
+    kind: ERRORS[code.data].kind,
+    data: (error as ORPCError<string, unknown>).data,
+  };
 }
 
 /** The first message per top-level field of a `VALIDATION_FAILED` error, e.g. `{ username: '…' }`. */

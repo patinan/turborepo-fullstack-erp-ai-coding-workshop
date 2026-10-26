@@ -22,7 +22,9 @@ describe('session token', () => {
   it('accepts a token just under 12 hours old', () => {
     const issuedAt = Date.now() - 12 * 60 * 60 * 1000 + 1000;
 
-    expect(verifySessionToken(createSessionToken('user-1', secret, issuedAt), secret)).not.toBeNull();
+    expect(
+      verifySessionToken(createSessionToken('user-1', secret, issuedAt), secret),
+    ).not.toBeNull();
   });
 
   it('rejects a token whose user id was changed', () => {

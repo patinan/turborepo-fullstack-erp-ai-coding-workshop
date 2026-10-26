@@ -27,14 +27,19 @@ test.describe('Sign in', () => {
     await signIn(page, 'staff_b01', 'wrong-password');
     await expect(alert).toHaveText('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
     await expect(page.getByRole('button', { name: 'ลองอีกครั้ง' })).toHaveCount(0);
+    // Neither field is marked, so the message doesn't reveal which one was wrong.
+    await expect(page.locator('[aria-invalid]')).toHaveCount(0);
 
     await signIn(page, 'nobody_here', PASSWORD);
     await expect(alert).toHaveText('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
   });
 
   test('the username is matched ignoring case and surrounding spaces', async ({ page }) => {
+    const login = page.waitForRequest('**/api/auth/login');
     await signIn(page, ' STAFF_B01 ');
 
+    // The form sends what was typed; the API does the matching.
+    expect((await login).postDataJSON().username).toBe(' STAFF_B01 ');
     await expect(page.getByRole('banner')).toContainText('Staff B01');
     const me = await (await page.request.get('/api/auth/me')).json();
     expect(me.user.username).toBe('staff_b01');
