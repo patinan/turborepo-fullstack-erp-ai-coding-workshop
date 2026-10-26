@@ -1,28 +1,34 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 export const SESSION_COOKIE = 'erp_session';
-export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** A sign-in lasts at most 12 hours [C-16]. */
+export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
 function sign(payload: string, secret: string): string {
   return createHmac('sha256', secret).update(payload).digest('base64url');
 }
 
-/** `<userId>.<expiresAt ms>.<HMAC>`: the user id is readable, but can't be changed without the secret. */
+/** `<userId>.<issuedAt ms>.<HMAC>`: readable, but can't be changed without the secret. */
 export function createSessionToken(userId: string, secret: string, now = Date.now()): string {
-  const payload = `${userId}.${now + SESSION_TTL_MS}`;
+  const payload = `${userId}.${now}`;
   return `${payload}.${sign(payload, secret)}`;
 }
 
-/** Returns the user id when the token is authentic and not expired, otherwise null. */
-export function verifySessionToken(token: string, secret: string, now = Date.now()): string | null {
-  const [userId, expiresAt, signature] = token.split('.');
-  if (!userId || !expiresAt || !signature) return null;
+/** The session when the token is authentic and not expired, otherwise null. */
+export function verifySessionToken(
+  token: string,
+  secret: string,
+  now = Date.now(),
+): { userId: string; issuedAt: Date } | null {
+  const [userId, issuedAt, signature] = token.split('.');
+  if (!userId || !issuedAt || !signature) return null;
 
-  const expected = Buffer.from(sign(`${userId}.${expiresAt}`, secret));
+  const expected = Buffer.from(sign(`${userId}.${issuedAt}`, secret));
   const actual = Buffer.from(signature);
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null;
 
-  return Number(expiresAt) > now ? userId : null;
+  const issued = Number(issuedAt);
+  return issued + SESSION_TTL_MS > now ? { userId, issuedAt: new Date(issued) } : null;
 }
 
 /** Read one cookie from a raw `Cookie` header. */
