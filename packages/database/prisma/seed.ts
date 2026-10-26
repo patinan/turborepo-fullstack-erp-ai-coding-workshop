@@ -1,30 +1,13 @@
-import { createPrismaClient, hashPassword, Role } from '../src/index.js';
+import { createPrismaClient, FIXTURE_PASSWORD, fixtureUsers, loadFixture } from '../src/index.js';
 
 const prisma = createPrismaClient(
   process.env.DATABASE_URL ?? 'postgresql://erp:erp@localhost:5432/erp',
 );
 
-// Demo accounts for the workshop (also shown on the login page). Re-running the seed resets them.
-const demoUsers = [
-  { email: 'admin@erp.local', name: 'Admin User', role: Role.ADMIN },
-  { email: 'staff@erp.local', name: 'Staff User', role: Role.STAFF },
-];
-const DEMO_PASSWORD = 'password';
-
-async function main() {
-  const passwordHash = await hashPassword(DEMO_PASSWORD);
-  for (const user of demoUsers) {
-    await prisma.user.upsert({
-      where: { email: user.email },
-      update: { name: user.name, role: user.role, passwordHash },
-      create: { ...user, passwordHash },
-    });
-  }
-  console.log(`Seeded ${demoUsers.length} demo users (password: "${DEMO_PASSWORD}").`);
-}
-
+// The §8.1 test stores and users (also shown on the sign-in page). Re-running the seed resets them.
 try {
-  await main();
+  await loadFixture(prisma);
+  console.log(`Seeded ${fixtureUsers.length} test users (password: "${FIXTURE_PASSWORD}").`);
 } finally {
   await prisma.$disconnect();
 }

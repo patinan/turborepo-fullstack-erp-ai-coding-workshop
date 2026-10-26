@@ -1,6 +1,5 @@
 // Prisma schema: https://www.prisma.io/docs/orm/prisma-schema
 //
-// Only the auth models ship with the starter. We will design the ERP data model together in the workshop.
 // After adding/changing a model run:  pnpm db:migrate --name <describe-the-change>
 
 generator client {
@@ -14,18 +13,37 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Administrator, Purchasing officer, Store employee, Manager.
 enum Role {
   ADMIN
-  STAFF
+  PURCHASING
+  STORE_STAFF
+  MANAGER
 }
 
+model Store {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// A CHECK in the migration requires `storeId` exactly when `role` is STORE_STAFF [C-18].
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
+  id                String    @id @default(cuid())
+  /// Stored trimmed and lower-cased (a CHECK enforces it), so the unique index is case-insensitive [C-20].
+  username          String    @unique
+  name              String
   /// Written by hashPassword() from @erp/database. Never returned by the API.
-  passwordHash String
-  role         Role     @default(STAFF)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  passwordHash      String
+  role              Role
+  storeId           String?
+  store             Store?    @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  active            Boolean   @default(true)
+  /// Sessions issued before this instant no longer work. Set when the user signs out.
+  sessionsRevokedAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
