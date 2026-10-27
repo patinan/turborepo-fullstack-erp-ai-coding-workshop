@@ -1,3 +1,3 @@
 import base from '@erp/eslint-config/base';
 
-export default [...base, { ignores: ['test-results/**', 'playwright-report/**'] }];
+export default [{ ignores: ['playwright-report/**', 'test-results/**', '.auth/**'] }, ...base];
