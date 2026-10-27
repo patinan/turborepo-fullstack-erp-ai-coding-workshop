@@ -1,20 +1,43 @@
 import { oc } from '@orpc/contract';
 import * as z from 'zod';
 
-export const RoleSchema = z.enum(['ADMIN', 'STAFF']);
+/** Administrator, Purchasing officer, Store employee, Manager. */
+export const RoleSchema = z.enum(['ADMIN', 'PURCHASING', 'STORE_STAFF', 'MANAGER']);
 export type Role = z.infer<typeof RoleSchema>;
 
-/** The signed-in user as the API exposes it (never includes the password hash). */
-export const UserSchema = z.object({
+export const StoreRefSchema = z.object({
   id: z.string(),
-  email: z.email(),
+  code: z.string(),
   name: z.string(),
-  role: RoleSchema,
 });
+export type StoreRef = z.infer<typeof StoreRefSchema>;
+
+const userFields = {
+  id: z.string(),
+  username: z.string(),
+  name: z.string(),
+};
+
+/**
+ * The signed-in user as the API exposes it (never includes the password hash).
+ * A store employee has exactly one assigned store; every other role has none [C-18].
+ */
+export const UserSchema = z.discriminatedUnion('role', [
+  z.object({ ...userFields, role: z.literal('STORE_STAFF'), store: StoreRefSchema }),
+  z.object({
+    ...userFields,
+    role: RoleSchema.exclude(['STORE_STAFF']),
+    store: z.null(),
+  }),
+]);
 export type User = z.infer<typeof UserSchema>;
 
-export const LoginInputSchema = z.object({
-  email: z.email(),
+/** Usernames are trimmed and case-insensitive [C-20], so they are compared in this form. */
+export const UsernameSchema = z.string().trim().toLowerCase().min(1);
+
+// Strict: an `email` field from an old client is an error, not silently ignored.
+export const LoginInputSchema = z.strictObject({
+  username: UsernameSchema,
   password: z.string().min(1),
 });
 export type LoginInput = z.infer<typeof LoginInputSchema>;
@@ -29,7 +52,7 @@ export const authContract = {
     .route({
       method: 'POST',
       path: '/auth/login',
-      summary: 'Sign in with email and password',
+      summary: 'Sign in with username and password',
       tags: ['Auth'],
     })
     .input(LoginInputSchema)

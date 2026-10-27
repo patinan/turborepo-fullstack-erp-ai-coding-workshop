@@ -1,16 +1,24 @@
-import { type ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import type { ExecutionContext } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import type { User } from '@erp/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import type { Env } from '../config/env.js';
 import type { PrismaService } from '../database/prisma.service.js';
 import { type AuthenticatedRequest, Public, Roles } from './auth.decorators.js';
 import { AuthGuard } from './auth.guard.js';
 import { createSessionToken, SESSION_COOKIE } from './session-token.js';
+import type { UserRow } from './user.js';
 
 const secret = 'test-secret-that-is-at-least-32-characters';
-const staff: User = { id: 'u1', email: 'staff@erp.local', name: 'Staff User', role: 'STAFF' };
+const b01 = { id: 's1', code: 'B01', name: 'Central Store' };
+const staff = {
+  id: 'u1',
+  username: 'staff_b01',
+  name: 'Staff B01',
+  role: 'STORE_STAFF',
+  store: b01,
+};
+const staffRow: UserRow = { ...staff, role: 'STORE_STAFF', active: true, sessionsRevokedAt: null };
 
 class RoutesUnderTest {
   @Public()
@@ -22,7 +30,7 @@ class RoutesUnderTest {
   adminOnly() {}
 }
 
-function setup(user: User | null) {
+function setup(user: UserRow | null) {
   const findUnique = vi.fn().mockResolvedValue(user);
   const guard = new AuthGuard(
     new Reflector(),
@@ -43,7 +51,9 @@ function setup(user: User | null) {
   return { run, findUnique };
 }
 
-const sessionCookie = (userId: string) => `${SESSION_COOKIE}=${createSessionToken(userId, secret)}`;
+const sessionCookie = (userId: string, issuedAt = Date.now()) =>
+  `${SESSION_COOKIE}=${createSessionToken(userId, secret, issuedAt)}`;
+const rejectsWith = (code: string) => expect.objectContaining({ code });
 
 describe('AuthGuard', () => {
   it('lets anyone call a @Public() route', async () => {
@@ -53,30 +63,30 @@ describe('AuthGuard', () => {
   });
 
   it('rejects a protected route without a session', async () => {
-    const { run } = setup(staff);
+    const { run } = setup(staffRow);
 
-    await expect(run('closed').result).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(run('closed').result).rejects.toEqual(rejectsWith('UNAUTHENTICATED'));
   });
 
   it('rejects a tampered cookie', async () => {
-    const { run, findUnique } = setup(staff);
+    const { run, findUnique } = setup(staffRow);
 
-    await expect(
-      run('closed', `${SESSION_COOKIE}=u1.9999999999999.forged`).result,
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(run('closed', `${SESSION_COOKIE}=u1.9999999999999.forged`).result).rejects.toEqual(
+      rejectsWith('UNAUTHENTICATED'),
+    );
     expect(findUnique).not.toHaveBeenCalled();
   });
 
   it('rejects a session whose user no longer exists', async () => {
     const { run } = setup(null);
 
-    await expect(run('closed', sessionCookie('gone')).result).rejects.toBeInstanceOf(
-      UnauthorizedException,
+    await expect(run('closed', sessionCookie('gone')).result).rejects.toEqual(
+      rejectsWith('UNAUTHENTICATED'),
     );
   });
 
   it('attaches the signed-in user to the request', async () => {
-    const { run } = setup(staff);
+    const { run } = setup(staffRow);
     const { request, result } = run('closed', sessionCookie('u1'));
 
     await expect(result).resolves.toBe(true);
@@ -84,16 +94,40 @@ describe('AuthGuard', () => {
   });
 
   it('rejects a user without the required role', async () => {
-    const { run } = setup(staff);
+    const { run } = setup(staffRow);
 
-    await expect(run('adminOnly', sessionCookie('u1')).result).rejects.toBeInstanceOf(
-      ForbiddenException,
+    await expect(run('adminOnly', sessionCookie('u1')).result).rejects.toEqual(
+      rejectsWith('FORBIDDEN'),
     );
   });
 
   it('allows a user with the required role', async () => {
-    const { run } = setup({ ...staff, role: 'ADMIN' });
+    const { run } = setup({ ...staffRow, role: 'ADMIN', store: null });
 
     await expect(run('adminOnly', sessionCookie('u1')).result).resolves.toBe(true);
+  });
+
+  it('rejects a deactivated user on their next request', async () => {
+    const { run } = setup({ ...staffRow, active: false });
+
+    await expect(run('closed', sessionCookie('u1')).result).rejects.toEqual(
+      rejectsWith('USER_INACTIVE'),
+    );
+  });
+
+  it('rejects a session issued before the user signed out', async () => {
+    const signedOutAt = new Date();
+    const { run } = setup({ ...staffRow, sessionsRevokedAt: signedOutAt });
+
+    await expect(
+      run('closed', sessionCookie('u1', signedOutAt.getTime() - 1000)).result,
+    ).rejects.toEqual(rejectsWith('UNAUTHENTICATED'));
+  });
+
+  it('accepts a session issued after the user signed out', async () => {
+    const signedOutAt = new Date(Date.now() - 1000);
+    const { run } = setup({ ...staffRow, sessionsRevokedAt: signedOutAt });
+
+    await expect(run('closed', sessionCookie('u1')).result).resolves.toBe(true);
   });
 });

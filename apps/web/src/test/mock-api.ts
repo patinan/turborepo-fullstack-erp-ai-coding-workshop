@@ -1,3 +1,4 @@
+import { ERRORS, type ErrorCode } from '@erp/contracts';
 import { vi } from 'vitest';
 
 /**
@@ -17,10 +18,13 @@ export function mockApi(routes: Record<string, unknown>) {
   return fetch;
 }
 
-/** The 401 the API sends for a missing session or a wrong password. */
-export function unauthorized(message = 'Unauthorized') {
-  return Response.json(
-    { defined: false, code: 'UNAUTHORIZED', status: 401, message },
-    { status: 401 },
-  );
+/** A failed call as the API sends it: `{ code, kind, data? }` with the catalogue status. */
+export function apiError(code: ErrorCode, data?: unknown) {
+  const { kind, status } = ERRORS[code];
+  return Response.json({ code, kind, data }, { status });
+}
+
+/** The 401 the API sends for a missing, expired or signed-out session. */
+export function unauthorized() {
+  return apiError('UNAUTHENTICATED');
 }

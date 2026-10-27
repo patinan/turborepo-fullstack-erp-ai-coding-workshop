@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
@@ -23,3 +24,41 @@ jobs:
       - run: pnpm format:check
 
       - run: pnpm turbo run lint typecheck test build
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      # The containers run as uid 1000 and write node_modules and dist into the checkout.
+      - run: chmod -R a+rwX .
+
+      - name: Start the stack
+        run: docker compose up -d api web
+
+      - name: Wait for the API and the web app
+        run: |
+          curl -sf --retry 60 --retry-delay 5 --retry-all-errors http://localhost:3000/api/health
+          curl -sf --retry 60 --retry-delay 5 --retry-all-errors -o /dev/null http://localhost:5173/login
+
+      # The e2e image adds Google Chrome and Microsoft Edge to the dev image.
+      - name: Playwright on Chrome and Edge
+        run: docker compose --profile e2e run --rm --no-deps -e CI=true e2e
+
+      - name: Browser versions
+        if: always()
+        run: cat apps/e2e/test-results/browsers/*.txt || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright
+          path: |
+            apps/e2e/playwright-report/
+            apps/e2e/test-results/
+          if-no-files-found: ignore
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs api web

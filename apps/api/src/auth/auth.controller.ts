@@ -1,14 +1,18 @@
 import { Controller, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { contract, type User } from '@erp/contracts';
-import { verifyPassword } from '@erp/database';
-import { Implement, implement, ORPCError } from '@orpc/nest';
+import { hashPassword, verifyPassword } from '@erp/database';
+import { Implement, implement } from '@orpc/nest';
 import type { CookieOptions, Response } from 'express';
 import type { Env } from '../config/env.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { apiError } from '../errors/api-error.js';
 import { CurrentUser, Public } from './auth.decorators.js';
-import { USER_SELECT } from './auth.guard.js';
 import { createSessionToken, SESSION_COOKIE, SESSION_TTL_MS } from './session-token.js';
+import { toUser, USER_SELECT } from './user.js';
+
+// Checked when the username is unknown, so that case takes as long as a wrong password.
+const unknownUserHash = hashPassword('unknown-user');
 
 @Controller()
 @Public()
@@ -30,24 +34,35 @@ export class AuthController {
   @Implement(contract.auth.login)
   login(@Res({ passthrough: true }) res: Response) {
     return implement(contract.auth.login).handler(async ({ input }) => {
+      // The contract has already trimmed and lower-cased the username, as it is stored.
       const found = await this.prisma.user.findUnique({
-        where: { email: input.email.toLowerCase() },
+        where: { username: input.username },
         select: { ...USER_SELECT, passwordHash: true },
       });
-      if (!found || !(await verifyPassword(input.password, found.passwordHash))) {
-        throw new ORPCError('UNAUTHORIZED', { message: 'Invalid email or password' });
-      }
+      const passwordOk = await verifyPassword(
+        input.password,
+        found?.passwordHash ?? (await unknownUserHash),
+      );
+      // The same error for both, so nobody learns which usernames exist.
+      if (!found || !passwordOk) throw apiError('INVALID_CREDENTIALS');
+      if (!found.active) throw apiError('USER_INACTIVE');
 
-      const { passwordHash: _, ...user } = found;
-      const token = createSessionToken(user.id, this.config.get('AUTH_SECRET', { infer: true }));
+      const token = createSessionToken(found.id, this.config.get('AUTH_SECRET', { infer: true }));
       res.cookie(SESSION_COOKIE, token, { ...this.cookieOptions, maxAge: SESSION_TTL_MS });
-      return user;
+      return toUser(found);
     });
   }
 
   @Implement(contract.auth.logout)
-  logout(@Res({ passthrough: true }) res: Response) {
-    return implement(contract.auth.logout).handler(() => {
+  logout(@CurrentUser() user: User | undefined, @Res({ passthrough: true }) res: Response) {
+    return implement(contract.auth.logout).handler(async () => {
+      // Ends every session issued until now, so a copied cookie stops working too.
+      if (user) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { sessionsRevokedAt: new Date() },
+        });
+      }
       res.clearCookie(SESSION_COOKIE, this.cookieOptions);
     });
   }

@@ -3,7 +3,7 @@ import { ORPCError } from '@orpc/client';
 import { hashKey, type QueryClient, useQuery } from '@tanstack/react-query';
 import { orpc } from '@/lib/orpc';
 
-/** The session from GET /api/auth/me. It only changes on login, logout or a 401, so it never goes stale. */
+/** The session from GET /api/auth/me. It only changes on login, logout or a signed-out error, so it never goes stale. */
 export function useSession() {
   return useQuery(orpc.auth.me.queryOptions({ staleTime: Infinity }));
 }
@@ -13,8 +13,12 @@ export function useCurrentUser(): User | null {
   return useSession().data?.user ?? null;
 }
 
+/** The session is missing, expired, signed out or its user was deactivated. */
 export function isUnauthorized(error: unknown): boolean {
-  return error instanceof ORPCError && error.status === 401;
+  return (
+    error instanceof ORPCError &&
+    (error.code === 'UNAUTHENTICATED' || error.code === 'USER_INACTIVE')
+  );
 }
 
 /** Forget the user and all their cached data. `RequireAuth` then redirects to /login. */

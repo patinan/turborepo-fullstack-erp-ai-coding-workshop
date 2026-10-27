@@ -1,6 +1,6 @@
 # Development image shared by the install, api, web and studio services.
 # The source code is NOT copied in: it is bind-mounted from your machine (see compose.yaml).
-FROM node:24-slim
+FROM node:24-slim AS dev
 
 # openssl is needed by the Prisma schema engine (migrations).
 RUN apt-get update \
@@ -25,3 +25,10 @@ RUN mkdir -p /pnpm/store /workspace && chown -R node:node /pnpm /workspace
 # (node_modules, dist, migrations) are owned by you on Linux/WSL, not by root.
 USER node
 WORKDIR /workspace
+
+# The e2e service: the same image plus Google Chrome and Microsoft Edge for Playwright (apps/e2e).
+# Keep the Playwright version in sync with @playwright/test in apps/e2e/package.json.
+FROM dev AS e2e
+USER root
+RUN npx -y playwright@1.64.1 install --with-deps chrome msedge
+USER node

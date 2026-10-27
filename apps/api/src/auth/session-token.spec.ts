@@ -9,16 +9,28 @@ import {
 const secret = 'test-secret-that-is-at-least-32-characters';
 
 describe('session token', () => {
-  it('round-trips the user id', () => {
-    const token = createSessionToken('user-1', secret);
+  it('round-trips the user id and issue time', () => {
+    const issuedAt = Date.now();
+    const token = createSessionToken('user-1', secret, issuedAt);
 
-    expect(verifySessionToken(token, secret)).toBe('user-1');
+    expect(verifySessionToken(token, secret)).toEqual({
+      userId: 'user-1',
+      issuedAt: new Date(issuedAt),
+    });
+  });
+
+  it('accepts a token just under 12 hours old', () => {
+    const issuedAt = Date.now() - 12 * 60 * 60 * 1000 + 1000;
+
+    expect(
+      verifySessionToken(createSessionToken('user-1', secret, issuedAt), secret),
+    ).not.toBeNull();
   });
 
   it('rejects a token whose user id was changed', () => {
-    const [, expiresAt, signature] = createSessionToken('user-1', secret).split('.');
+    const [, issuedAt, signature] = createSessionToken('user-1', secret).split('.');
 
-    expect(verifySessionToken(`user-2.${expiresAt}.${signature}`, secret)).toBeNull();
+    expect(verifySessionToken(`user-2.${issuedAt}.${signature}`, secret)).toBeNull();
   });
 
   it('rejects a token signed with another secret', () => {

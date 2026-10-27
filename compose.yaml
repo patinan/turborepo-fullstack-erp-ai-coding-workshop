@@ -1,6 +1,7 @@
 # Local development stack. Usage:
 #   docker compose up            # postgres + api + web
 #   docker compose --profile tools up studio   # Prisma Studio on http://localhost:5555
+#   docker compose --profile e2e run --rm --no-deps e2e   # Playwright (apps/e2e) against the running stack
 #
 # Every value below has a default; override any of them in a .env file (see .env.example).
 
@@ -18,6 +19,7 @@ x-node-app: &node-app
   build:
     context: .
     dockerfile: docker/dev.Dockerfile
+    target: dev
   image: erp-workshop-dev
   working_dir: /workspace
   volumes:
@@ -86,6 +88,20 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Playwright on Chrome and Edge. Shares the web container's network, so the app is on localhost:5173.
+  e2e:
+    <<: *node-app
+    profiles: [e2e]
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+      target: e2e
+    image: erp-workshop-e2e
+    command: pnpm --filter @erp/e2e test:e2e
+    network_mode: service:web
+    depends_on:
+      - web
 
 volumes:
   postgres-data:
