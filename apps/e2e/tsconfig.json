@@ -1,7 +1,9 @@
 {
   "extends": "@erp/typescript-config/library.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    // page.evaluate() callbacks run in the browser.
+    "lib": ["ES2023", "DOM"]
   },
   "include": ["tests", "playwright.config.ts"]
 }
