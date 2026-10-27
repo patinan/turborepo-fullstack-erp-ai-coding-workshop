@@ -2,11 +2,15 @@ import { Controller } from '@nestjs/common';
 import { contract } from '@erp/contracts';
 import { Implement, implement } from '@orpc/nest';
 import { Public } from '../auth/auth.decorators.js';
+import { Clock } from '../clock/clock.js';
 import { PrismaService } from '../database/prisma.service.js';
 
 @Controller()
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly clock: Clock,
+  ) {}
 
   // Route, method, input and output all come from the shared contract.
   @Public()
@@ -18,7 +22,7 @@ export class HealthController {
         () => 'error' as const,
       );
 
-      return { api: 'ok' as const, database, timestamp: new Date().toISOString() };
+      return { api: 'ok' as const, database, timestamp: this.clock.now().toISOString() };
     });
   }
 }

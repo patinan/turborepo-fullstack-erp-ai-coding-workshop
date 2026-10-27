@@ -5,6 +5,7 @@ import { hashPassword } from '@erp/database';
 import { call } from '@orpc/server';
 import type { Response } from 'express';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { Clock } from '../clock/clock.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AuthController } from './auth.controller.js';
 import { SESSION_COOKIE, verifySessionToken } from './session-token.js';
@@ -23,6 +24,7 @@ async function createController(findUnique = vi.fn(), update = vi.fn()) {
   const moduleRef = await Test.createTestingModule({
     controllers: [AuthController],
     providers: [
+      Clock,
       { provide: PrismaService, useValue: { user: { findUnique, update } } },
       {
         provide: ConfigService,

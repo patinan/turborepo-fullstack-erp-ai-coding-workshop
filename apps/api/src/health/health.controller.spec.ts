@@ -1,13 +1,14 @@
 import { Test } from '@nestjs/testing';
 import { call } from '@orpc/server';
 import { describe, expect, it, vi } from 'vitest';
+import { Clock } from '../clock/clock.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { HealthController } from './health.controller.js';
 
 async function createController(queryRaw: () => Promise<unknown>) {
   const moduleRef = await Test.createTestingModule({
     controllers: [HealthController],
-    providers: [{ provide: PrismaService, useValue: { $queryRaw: vi.fn(queryRaw) } }],
+    providers: [Clock, { provide: PrismaService, useValue: { $queryRaw: vi.fn(queryRaw) } }],
   }).compile();
 
   return moduleRef.get(HealthController);

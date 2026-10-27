@@ -9,6 +9,23 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # The API integration tests create and use `erp_test` on this server (apps/api/src/test).
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: erp
+          POSTGRES_PASSWORD: erp
+          POSTGRES_DB: erp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U erp -d erp"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgresql://erp:erp@localhost:5432/erp
     steps:
       - uses: actions/checkout@v5
 
