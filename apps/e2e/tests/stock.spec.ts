@@ -57,22 +57,25 @@ test.describe('Stock screen', () => {
     await expect(screen.row('SKU003')).toContainText('ใกล้หมด');
   });
 
-  test('every field has a label, and the page fits 1366 px without horizontal scroll (NFR-06)', async ({
-    page,
-  }) => {
-    await openStock(page, 'manager01');
-    await expect(stockScreen(page).row('SKU001').first()).toBeVisible();
+  // staff_b01 as the ticket says; manager01 sees both stores, so the widest table.
+  for (const username of ['staff_b01', 'manager01']) {
+    test(`every field has a label, and the page fits 1366 px without horizontal scroll, for ${username} (NFR-06)`, async ({
+      page,
+    }) => {
+      await openStock(page, username);
+      await expect(stockScreen(page).row('SKU001').first()).toBeVisible();
 
-    const { violations } = await new AxeBuilder({ page })
-      .withRules(['label', 'aria-input-field-name', 'button-name', 'form-field-multiple-labels'])
-      .analyze();
-    expect(violations).toEqual([]);
+      const { violations } = await new AxeBuilder({ page })
+        .withRules(['label', 'aria-input-field-name', 'button-name', 'form-field-multiple-labels'])
+        .analyze();
+      expect(violations).toEqual([]);
 
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow).toBe(0);
-  });
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBe(0);
+    });
+  }
 
   test('the navigation shows the stock screen to staff_b01 and not to admin01 (NFR-01.6)', async ({
     page,

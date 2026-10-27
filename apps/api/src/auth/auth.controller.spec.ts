@@ -62,7 +62,7 @@ describe('AuthController', () => {
     );
     const [name, token, options] = res.cookie.mock.calls[0]!;
     expect(name).toBe(SESSION_COOKIE);
-    expect(verifySessionToken(token, secret)?.userId).toBe('u1');
+    expect(verifySessionToken(token, secret, Date.now())?.userId).toBe('u1');
     expect(options).toMatchObject({ httpOnly: true, sameSite: 'lax', maxAge: 12 * 60 * 60 * 1000 });
   });
 

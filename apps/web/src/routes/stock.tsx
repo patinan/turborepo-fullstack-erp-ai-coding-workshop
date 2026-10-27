@@ -1,12 +1,12 @@
-import type { StockList } from '@erp/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { Badge } from '@/components/ui/badge';
+import { Pager } from '@/components/pager';
+import { QueryError } from '@/components/query-error';
+import { StockTable } from '@/components/stock-table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { errorMessage, toApiError } from '@/lib/errors';
 import { orpc } from '@/lib/orpc';
 
 /**
@@ -74,95 +74,15 @@ export function StockPage() {
           กำลังโหลด…
         </p>
       ) : stock.isError ? (
-        <StockError error={stock.error} onRetry={() => stock.refetch()} />
+        <QueryError error={stock.error} onRetry={() => stock.refetch()} />
       ) : stock.data.items.length === 0 ? (
         <p className="text-muted-foreground">ไม่พบสินค้าที่ตรงกับเงื่อนไข</p>
       ) : (
         <>
-          <StockTable list={stock.data} />
-          <Pager list={stock.data} onPage={(next) => show({ page: next })} />
+          <StockTable rows={stock.data.items} />
+          <Pager {...stock.data} onPage={(next) => show({ page: next })} />
         </>
       )}
-    </div>
-  );
-}
-
-function StockError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
-  const apiError = toApiError(error);
-  return (
-    <div role="alert" className="space-y-2 text-sm text-destructive">
-      <p>{errorMessage(apiError)}</p>
-      {apiError.kind === 'retry' && (
-        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-          ลองอีกครั้ง
-        </Button>
-      )}
-    </div>
-  );
-}
-
-function StockTable({ list }: { list: StockList }) {
-  return (
-    <table className="w-full text-sm">
-      <thead className="border-b text-left text-muted-foreground">
-        <tr>
-          <th className="py-2 font-medium">SKU</th>
-          <th className="py-2 font-medium">ชื่อสินค้า</th>
-          <th className="py-2 font-medium">สาขา</th>
-          <th className="py-2 text-right font-medium">คงเหลือ</th>
-          <th className="py-2 pl-4 font-medium">หน่วย</th>
-          <th className="py-2 text-right font-medium">จุดสั่งซื้อ</th>
-          <th className="py-2 pl-4 font-medium">สถานะ</th>
-        </tr>
-      </thead>
-      <tbody>
-        {list.items.map((row) => (
-          <tr key={`${row.product.id}-${row.store.id}`} className="border-b">
-            <td className="py-2 font-mono">{row.product.sku}</td>
-            <td className="py-2">{row.product.name}</td>
-            <td className="py-2">{row.store.code}</td>
-            <td className="py-2 text-right tabular-nums">{row.quantity}</td>
-            <td className="py-2 pl-4">{row.product.unit}</td>
-            <td className="py-2 text-right tabular-nums">{row.reorderThreshold}</td>
-            <td className="py-2 pl-4">
-              {row.lowStock ? (
-                <Badge variant="destructive">ใกล้หมด</Badge>
-              ) : (
-                <span className="text-muted-foreground">ปกติ</span>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function Pager({ list, onPage }: { list: StockList; onPage: (page: number) => void }) {
-  const pages = Math.max(1, Math.ceil(list.total / list.pageSize));
-  return (
-    <div className="flex items-center justify-between text-sm text-muted-foreground">
-      <span>
-        ทั้งหมด {list.total} รายการ · หน้า {list.page} จาก {pages}
-      </span>
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={list.page <= 1}
-          onClick={() => onPage(list.page - 1)}
-        >
-          ก่อนหน้า
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={list.page >= pages}
-          onClick={() => onPage(list.page + 1)}
-        >
-          ถัดไป
-        </Button>
-      </div>
     </div>
   );
 }

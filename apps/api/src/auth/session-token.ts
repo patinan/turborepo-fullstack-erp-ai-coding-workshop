@@ -9,7 +9,8 @@ function sign(payload: string, secret: string): string {
 }
 
 /** `<userId>.<issuedAt ms>.<HMAC>`: readable, but can't be changed without the secret. */
-export function createSessionToken(userId: string, secret: string, now = Date.now()): string {
+/** `now` comes from the injected `Clock`, in milliseconds. */
+export function createSessionToken(userId: string, secret: string, now: number): string {
   const payload = `${userId}.${now}`;
   return `${payload}.${sign(payload, secret)}`;
 }
@@ -18,7 +19,7 @@ export function createSessionToken(userId: string, secret: string, now = Date.no
 export function verifySessionToken(
   token: string,
   secret: string,
-  now = Date.now(),
+  now: number,
 ): { userId: string; issuedAt: Date } | null {
   const [userId, issuedAt, signature] = token.split('.');
   if (!userId || !issuedAt || !signature) return null;
