@@ -60,17 +60,20 @@ Create `src/<feature>/<feature>.module.ts` and `src/<feature>/<feature>.controll
 import { Controller } from '@nestjs/common';
 import { contract } from '@erp/contracts';
 import { Implement, implement } from '@orpc/nest';
+import { Roles } from '../auth/auth.decorators.js';
 import { PrismaService } from '../database/prisma.service.js';
 
 @Controller()
 export class CustomersController {
   constructor(private readonly prisma: PrismaService) {}
 
+  @Roles('PURCHASING', 'MANAGER')
   @Implement(contract.customers.list)
   list() {
     return implement(contract.customers.list).handler(() => this.prisma.customer.findMany());
   }
 
+  @Roles('PURCHASING')
   @Implement(contract.customers.create)
   create() {
     return implement(contract.customers.create).handler(({ input }) =>
@@ -92,10 +95,10 @@ Register the module in `src/app.module.ts`. `PrismaService` is global, no import
 
 - `input` is already validated and typed by the contract. No DTOs, no `class-validator`.
 - For errors throw a catalogue code with `apiError` from `../errors/api-error.js` (e.g. `throw apiError('NOT_FOUND')`). New codes go into `packages/contracts/src/errors.ts` and need a Thai message in `apps/web/src/lib/errors.ts` (ADR-0003).
-- Auth: every route already requires a signed-in user. Imports come from `../auth/auth.decorators.js`:
+- Auth (ADR-0004): every route declares who may call it, from the spec's §4.2. `@Roles(...)` allows signed-in users with those roles (`@Roles(...ALL_ROLES)` for any); a route with neither `@Roles` nor `@Public` is refused with `FORBIDDEN`. Imports come from `../auth/auth.decorators.js`:
 
   ```ts
-  @Roles('ADMIN')                                   // optional: only these roles (else 403)
+  @Roles('PURCHASING')                              // everyone else gets 403
   @Implement(contract.customers.create)
   create(@CurrentUser() user: User) {               // User from @erp/contracts
     return implement(contract.customers.create).handler(({ input }) =>
@@ -104,7 +107,9 @@ Register the module in `src/app.module.ts`. `PrismaService` is global, no import
   }
   ```
 
-  Use `@Public()` only for routes that must work while signed out.
+  Use `@Public()` only for routes that must work while signed out. A route that reads one store's data adds `@StoreScope('storeId')` and limits a store employee to `user.store` when the parameter is left out (reference: `src/stock/stock.controller.ts`).
+- Add the route's row to the permission matrix in `src/auth/permissions.int.spec.ts`. The test fails until it has one.
+- The current time comes from the injected `Clock` (`src/clock`), never `new Date()` or `Date.now()`.
 - Reference: `src/health/health.controller.ts`.
 
 ## 4. Web (`apps/web`)
@@ -118,7 +123,7 @@ Register the module in `src/app.module.ts`. `PrismaService` is global, no import
 
 ## 5. Tests and checks
 
-Write the api `*.spec.ts` and web `*.test.tsx` (see the `write-tests` skill), then run:
+Write the api integration tests (`*.int.spec.ts`, against the real API and Postgres), any api unit `*.spec.ts`, and the web tests (see the `write-tests` skill), then run:
 
 ```bash
 pnpm check        # lint + typecheck + test + build, from the repo root

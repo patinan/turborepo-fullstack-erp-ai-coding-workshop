@@ -2,7 +2,16 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from './generated/prisma/client.js';
 
 export * from './generated/prisma/client.js';
-export { FIXTURE_PASSWORD, fixtureStores, fixtureUsers, loadFixture } from './fixture.js';
+export {
+  FIXTURE_PASSWORD,
+  FIXTURE_REORDER_THRESHOLD,
+  fixtureOpeningStock,
+  fixtureProducts,
+  fixtureStores,
+  fixtureUsers,
+  loadFixture,
+  resetFixture,
+} from './fixture.js';
 export { hashPassword, verifyPassword } from './password.js';
 
 /** Prisma 7 talks to Postgres through a driver adapter (node-postgres). */

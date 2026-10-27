@@ -2,9 +2,10 @@ import type { ExecutionContext } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { describe, expect, it, vi } from 'vitest';
+import { Clock } from '../clock/clock.js';
 import type { Env } from '../config/env.js';
 import type { PrismaService } from '../database/prisma.service.js';
-import { type AuthenticatedRequest, Public, Roles } from './auth.decorators.js';
+import { ALL_ROLES, type AuthenticatedRequest, Public, Roles } from './auth.decorators.js';
 import { AuthGuard } from './auth.guard.js';
 import { createSessionToken, SESSION_COOKIE } from './session-token.js';
 import type { UserRow } from './user.js';
@@ -24,10 +25,13 @@ class RoutesUnderTest {
   @Public()
   open() {}
 
+  @Roles(...ALL_ROLES)
   closed() {}
 
   @Roles('ADMIN')
   adminOnly() {}
+
+  undeclared() {}
 }
 
 function setup(user: UserRow | null) {
@@ -36,6 +40,7 @@ function setup(user: UserRow | null) {
     new Reflector(),
     { user: { findUnique } } as unknown as PrismaService,
     { get: () => secret } as unknown as ConfigService<Env, true>,
+    new Clock(),
   );
 
   function run(route: keyof RoutesUnderTest, cookie?: string) {
@@ -97,6 +102,14 @@ describe('AuthGuard', () => {
     const { run } = setup(staffRow);
 
     await expect(run('adminOnly', sessionCookie('u1')).result).rejects.toEqual(
+      rejectsWith('FORBIDDEN'),
+    );
+  });
+
+  it('rejects every signed-in user on a route that declares no roles', async () => {
+    const { run } = setup({ ...staffRow, role: 'MANAGER', store: null });
+
+    await expect(run('undeclared', sessionCookie('u1')).result).rejects.toEqual(
       rejectsWith('FORBIDDEN'),
     );
   });

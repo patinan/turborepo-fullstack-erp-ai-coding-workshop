@@ -1,6 +1,6 @@
 ---
 name: write-tests
-description: How tests are written and run in this repo - NestJS controller specs with a stubbed PrismaService and oRPC call(), React component tests with a QueryClient and a stubbed fetch, Zod schema tests. Use when adding or fixing tests.
+description: How tests are written and run in this repo - API integration tests against the real API and Postgres, NestJS controller specs with a stubbed PrismaService and oRPC call(), React component tests with a QueryClient and a stubbed fetch, Zod schema tests, Playwright e2e. Use when adding or fixing tests.
 ---
 
 # Write tests
@@ -9,11 +9,37 @@ Everything runs on Vitest. Tests are colocated with the code they cover.
 
 | Package              | File name     | Run only this package                     |
 | -------------------- | ------------- | ----------------------------------------- |
-| `apps/api`           | `*.spec.ts`   | `pnpm turbo run test --filter=@erp/api`   |
+| `apps/api`           | `*.int.spec.ts` (integration), `*.spec.ts` (unit) | `pnpm turbo run test --filter=@erp/api`   |
 | `apps/web`           | `*.test.tsx`  | `pnpm turbo run test --filter=@erp/web`   |
 | `packages/contracts` | `*.test.ts`   | `pnpm turbo run test --filter=@erp/contracts` |
 
 `pnpm test` runs all of them. Inside Docker prefix with `docker compose exec api`.
+
+## API integration test
+
+The proof for every stock, permission and error rule (spec §2.1). Each `*.int.spec.ts` starts the whole API with `startApi()` from `apps/api/src/test/api.ts` and sends real HTTP requests to it. The `integration` Vitest project (`apps/api/vitest.config.ts`) creates `<database>_test` next to `DATABASE_URL` and migrates it once, then before **every** test empties it and loads the §8.1 fixture, and after every test checks the ledger invariant (INV-03.1). Reference: `apps/api/src/stock/stock.int.spec.ts`.
+
+```ts
+let api: TestApi;
+beforeAll(async () => {
+  api = await startApi();
+});
+afterAll(() => api.close());
+
+it('refuses staff_b01 asking for B02', async () => {
+  const staff = await api.signIn('staff_b01'); // real POST /auth/login, fixture password
+
+  const response = await staff.get(`/stock?storeId=${b02Id}`);
+
+  expect(response).toEqual({ status: 403, body: { code: 'FORBIDDEN', kind: 'correct' } });
+});
+```
+
+- `api.anonymous` calls without a session. `db` from `src/test/db.ts` sets up or checks data the API can't (raw SQL, extra products).
+- Fix the time with `api.clock.set(date)` and reset it with `api.clock.set(null)` in `afterEach`.
+- Override providers with `startApi((builder) => builder.overrideProvider(X).useValue(y))`, or spy on `api.app.get(PrismaService)` to force a failure.
+- A new route needs a row in the permission matrix (`src/auth/permissions.int.spec.ts`).
+- Run one file: `docker compose exec api sh -c 'cd apps/api && pnpm exec vitest run --project integration src/stock/stock.int.spec.ts'`. Needs the compose Postgres.
 
 ## API controller spec
 
@@ -101,4 +127,4 @@ Call `Schema.safeParse(...)` with a valid and an invalid payload and assert `res
 
 ## End-to-end test (Playwright)
 
-`apps/e2e/tests/*.spec.ts` drive the real app on Chrome and Edge at 1366×768. Start the stack (`docker compose up`), then run `docker compose --profile e2e run --rm --no-deps e2e`. The e2e image has both browsers. Find fields by their Thai label (`signInForm()` in `tests/fixtures.ts`), sign in with the seeded users (`packages/database/src/fixture.ts`), and use `page.route()` only for failures the real stack can't produce (e.g. `INTERNAL_ERROR`). Reference: `apps/e2e/tests/sign-in.spec.ts`.
+`apps/e2e/tests/*.spec.ts` drive the real app on Chrome and Edge at 1366×768. Start the stack (`docker compose up`), then run `docker compose --profile e2e run --rm --no-deps e2e`. The e2e image has both browsers. Find fields by their Thai label (`signInForm()` in `tests/fixtures.ts`), sign in with the seeded users (`packages/database/src/fixture.ts`), and use `page.route()` only for what the real stack can't produce on demand: a failure such as `INTERNAL_ERROR`, or holding a response back to see the loading state. Reference: `apps/e2e/tests/sign-in.spec.ts`.
